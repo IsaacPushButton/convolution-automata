@@ -9,7 +9,7 @@ if __name__ == '__main__':
         texture_size=(1000, 1000),
         desired_fps=60,
         skip=Skip.Even,
-        preset=presets.Preset(program=shaders.Worm()),
+        preset=presets.Preset(program=shaders.Worm()).set_color(1, 0, 0),
 ))
     window.run()
 
