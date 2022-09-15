@@ -3,13 +3,9 @@ import numpy as np
 
 import moderngl
 import moderngl_window as mglw
+import shaders
 
-from base.base import vertex, frag
-from conway.conway import conway_shader
-from slime.slime import slime_shader
-from worms.worms import worm_shader
-
-PROG = worm_shader()
+PROG = shaders.worm
 
 class Automata(mglw.WindowConfig):
     title = "Automata"
@@ -19,7 +15,7 @@ class Automata(mglw.WindowConfig):
         super().__init__(**kwargs)
 
         # How often the map should be updated
-        self.update_delay = 1 / 60  # updates per second
+        self.update_delay = 1 / 500  # updates per second
         self.last_updated = 0
         # size of the map
         self.width, self.height = 600, 600
@@ -32,8 +28,8 @@ class Automata(mglw.WindowConfig):
         # Program drawing the result to the screen.
         # This is rendered simply using a textured screen aligned triangle strip
         self.display_prog = self.ctx.program(
-            vertex_shader=vertex(),
-            fragment_shader=frag(),
+            vertex_shader=shaders.vertex,
+            fragment_shader=shaders.frag,
         )
 
         # Program calculating the next state of the map
