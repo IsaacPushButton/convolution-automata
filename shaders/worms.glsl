@@ -26,16 +26,12 @@ float activate(float x) {
 void main() {
     int width = textureSize(Texture, 0).x;
     ivec2 in_text = ivec2(gl_VertexID % width, gl_VertexID / width);
-//    float convolve_filter[9] = float[9](
-//                0.68,-0.9,0.68,
-//                -0.9,-0.66,-0.9,
-//                0.68,-0.9,0.68
-//    );
     float convolve_filter[9] = float[9](
-                0.69,-0.9,0.68,
+                0.68,-0.9,0.68,
                 -0.9,-0.66,-0.9,
-                0.68,-0.9,0.69
+                0.68,-0.9,0.68
     );
+
     ivec2 offsets[9] = ivec2[9](
         ivec2(-1,-1),
         ivec2(0,-1),

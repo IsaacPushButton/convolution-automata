@@ -1,6 +1,5 @@
-from abc import ABC, abstractmethod
 from typing import Callable, TypeVar
-import os
+from typing import List
 
 def load_shader(path: str):
     with open(f"./shaders/{path}", "r") as f:
@@ -54,3 +53,54 @@ def Slime() -> ShaderCode:
 def Conway() -> ShaderCode:
     return load_shader("conway.glsl")
 
+def symmetric_filter(corner: float, top: float,mid: float):
+    return [
+        corner,top,corner,
+        top,mid,top,
+        corner,top,corner
+    ]
+def custom_shader(convolve_vals: List[float], activation: str) -> ShaderCode:
+    def custom_activation(expr: str):
+        return f"float activate(float x){{ return {expr};}}"
+
+    def slime_activation():
+        return custom_activation("-1./(0.89*pow(x, 2.)+1.)+1.")
+
+    def convolve_filter(convolve_filter: List[float]):
+        return ",".join([str(float(i)) for i in convolve_filter])
+
+    return f"""
+        #version 330
+        uniform sampler2D Texture;
+        out float out_vert;
+        out float last_vert;
+        float cell(int x, int y) {{
+            ivec2 tSize = textureSize(Texture, 0).xy;
+            return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).r;
+        }}        
+        {custom_activation(activation)}
+        void main() {{
+            int width = textureSize(Texture, 0).x;
+            ivec2 in_text = ivec2(gl_VertexID % width, gl_VertexID / width);
+            float convolve_filter[9] = float[9](
+                       {convolve_filter(convolve_vals)}
+            );
+            ivec2 offsets[9] = ivec2[9](
+                ivec2(-1,-1),
+                ivec2(0,-1),
+                ivec2(1,-1),
+                ivec2(-1,0),
+                ivec2(0,0),
+                ivec2(1,0),
+                ivec2(-1,1),
+                ivec2(0,1),
+                ivec2(1,1)
+            );
+
+            float convolve_sum = 0;
+            for (int i=0;i<9;i++){{
+                convolve_sum += cell(in_text.x + offsets[i].x, in_text.y + offsets[i].y) * convolve_filter[i];
+            }}
+            out_vert = activate(convolve_sum);
+        }}
+    """

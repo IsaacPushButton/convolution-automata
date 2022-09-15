@@ -9,6 +9,7 @@ class Skip(Enum):
     Even = auto()
     Odd = auto()
     NoSkip = auto()
+    Three = auto()
 
 @dataclass
 class GameConfig:
@@ -66,16 +67,28 @@ def new_window(game_config: GameConfig):
             # Transform vertex array to generate new map state
             self.tao = self.ctx.vertex_array(self.transform_prog, [])
             self.pbo = self.ctx.buffer(reserve=pixels.nbytes)  # buffer to store the result
+            if game_config.skip == Skip.Odd:
+                self.tao.transform(self.pbo, vertices=self.width * self.height)
+                self.texture.write(self.pbo)
 
         def render(self, time, frame_time):
             self.ctx.clear(1.0, 1.0, 1.0)
             # Bind texture to channel 0
             self.texture.use(location=0)
             if time - self.last_updated > self.update_delay:
+                # We cant actually skip anything so we just run the transform
+                # multiple times
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
                 self.texture.write(self.pbo)
-                self.tao.transform(self.pbo, vertices=self.width * self.height)
-                self.texture.write(self.pbo)
+                if game_config.skip != Skip.NoSkip:
+                    self.tao.transform(self.pbo, vertices=self.width * self.height)
+                    self.texture.write(self.pbo)
+                if game_config.skip == Skip.Three:
+                    self.tao.transform(self.pbo, vertices=self.width * self.height)
+                    self.texture.write(self.pbo)
+
+
+
                 self.last_updated = time
 
             self.vao.render(moderngl.TRIANGLE_STRIP)
