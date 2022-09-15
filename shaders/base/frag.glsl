@@ -9,6 +9,5 @@ in vec2 v_text;
 out vec4 f_color;
 
 void main() {
-
-    f_color = 1. -vec4(texture(Texture, v_text).r, 1.0,1.0,1.0);
+    f_color = vec4(texture(Texture, v_text).r);
 }
