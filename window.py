@@ -26,6 +26,7 @@ def new_window(game_config: GameConfig):
         window_size = game_config.window_size
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
+            self.paused = True
             # How often the map should be updated
             self.update_delay = 1 / game_config.desired_fps  # updates per second
             self.last_updated = 0
@@ -71,11 +72,15 @@ def new_window(game_config: GameConfig):
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
                 self.texture.write(self.pbo)
 
+        def key_event(self, key, action, modifiers):
+            if action == self.wnd.keys.ACTION_PRESS:
+                self.paused = not self.paused
+
         def render(self, time, frame_time):
             self.ctx.clear(1.0, 1.0, 1.0)
             # Bind texture to channel 0
             self.texture.use(location=0)
-            if time - self.last_updated > self.update_delay:
+            if time - self.last_updated > self.update_delay and not self.paused:
                 # We cant actually skip anything so we just run the transform
                 # multiple times
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
