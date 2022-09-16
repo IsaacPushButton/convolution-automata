@@ -1,9 +1,14 @@
 from dataclasses import dataclass
+from typing import List
+
 import presets
 import moderngl
 import moderngl_window as mglw
 from aenum import Enum, auto
 import numpy as np
+
+from shaders import custom_shader, random_symetric, slime_activation, Shader, worm_activation, random_filter
+
 
 class Skip(Enum):
     Even = auto()
@@ -18,15 +23,27 @@ class GameConfig:
     desired_fps: int
     skip: Skip
     preset: presets.Preset
+    pause_start: bool
+
+def print_filter(filter: List[float]):
+    str_vals = [str(i) for i in filter]
+    print("New filter:")
+    print(",".join(str_vals[:3]))
+    print(",".join(str_vals[3:6]))
+    print(",".join(str_vals[6:]))
 
 def new_window(game_config: GameConfig):
     """Making class in a closure to pass values into it a bit easier"""
     class AutomataBase(mglw.WindowConfig):
         title = "Automata"
         window_size = game_config.window_size
+        convolve_filter = None
+        activation = None
+        last_button = 0
+
         def __init__(self, **kwargs):
             super().__init__(**kwargs)
-            self.paused = True
+            self.paused = game_config.pause_start
             # How often the map should be updated
             self.update_delay = 1 / game_config.desired_fps  # updates per second
             self.last_updated = 0
@@ -72,16 +89,50 @@ def new_window(game_config: GameConfig):
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
                 self.texture.write(self.pbo)
 
+        def set_program(self, program: Shader):
+            self.transform_prog = self.ctx.program(
+                vertex_shader=program,
+                varyings=['out_vert']
+            )
+            self.tao = self.ctx.vertex_array(self.transform_prog, [])
+
+        def mouse_drag_event(self, x: int, y: int, dx: int, dy: int):
+            self.mouse_press_event(x, y, self.last_button)
+
+        def mouse_press_event(self, x: int, y: int, button: int):
+            self.last_button = button
+            poke_size = 5
+            buffer_vals = np.frombuffer(self.pbo.read(), dtype="f4").reshape(self.width, self.height)
+            buffer_vals = buffer_vals.copy()
+            ny = self.height - y
+            buffer_vals[ny-poke_size:ny+poke_size,x-poke_size:x+poke_size] = button - 1
+            self.pbo.write(buffer_vals)
+            self.texture.write(self.pbo)
+
+
         def key_event(self, key, action, modifiers):
-            if action == self.wnd.keys.ACTION_PRESS:
+            if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.SPACE:
                 self.paused = not self.paused
+            if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.C:
+                new_filter = random_filter()
+                print_filter(new_filter)
+                self.set_program(
+                    custom_shader(
+                        new_filter,
+                        slime_activation()
+                    )
+                )
+            if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.V:
+                self.texture = self.ctx.texture((self.width, self.height), 1, np.random.rand(self.width, self.height).astype('f4').tobytes(), dtype='f4')
+                self.texture.filter = moderngl.NEAREST, moderngl.NEAREST
+                self.texture.swizzle = 'RRR1'  # What components texelFetch will get from the texture (in shader)
 
         def render(self, time, frame_time):
             self.ctx.clear(1.0, 1.0, 1.0)
             # Bind texture to channel 0
             self.texture.use(location=0)
             if time - self.last_updated > self.update_delay and not self.paused:
-                # We cant actually skip anything so we just run the transform
+                # We cant actually skip anything, so we just run the transform
                 # multiple times
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
                 self.texture.write(self.pbo)

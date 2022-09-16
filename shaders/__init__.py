@@ -1,6 +1,6 @@
 from typing import Callable, TypeVar
 from typing import List
-
+import random
 def load_shader(path: str):
     with open(f"./shaders/{path}", "r") as f:
         return f.read()
@@ -59,15 +59,32 @@ def symmetric_filter(corner: float, top: float,mid: float):
         top,mid,top,
         corner,top,corner
     ]
+
+def random_float(abs_max: float):
+    return ((random.random() - 0.5) * 2) * abs_max
+
+def random_symetric(abs_max: float):
+    c = random_float(abs_max)
+    t = random_float(abs_max)
+    m = random_float(abs_max)
+    return symmetric_filter(c, t, m)
+
+def random_filter():
+    return [random_float(1) for i in range(9)]
+
+
+def slime_activation():
+    return "-1./(0.89*pow(x, 2.)+1.)+1."
+
+def worm_activation():
+    return "-1./pow(2., (0.6*pow(x, 2.)))+1."
+
 def custom_shader(convolve_vals: List[float], activation: str) -> ShaderCode:
-    def custom_activation(expr: str):
-        return f"float activate(float x){{ return {expr};}}"
-
-    def slime_activation():
-        return custom_activation("-1./(0.89*pow(x, 2.)+1.)+1.")
-
     def convolve_filter(convolve_filter: List[float]):
         return ",".join([str(float(i)) for i in convolve_filter])
+
+    def custom_activation(expr: str):
+        return f"float activate(float x){{ return {expr};}}"
 
     return f"""
         #version 330
