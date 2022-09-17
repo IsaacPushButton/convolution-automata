@@ -1,4 +1,5 @@
-from typing import Callable, TypeVar
+from dataclasses import dataclass
+from typing import Callable, TypeVar, Tuple
 from typing import List
 
 def load_shader(path: str):
@@ -9,6 +10,24 @@ def load_shader(path: str):
 Shader = Callable[[], str]
 FragShader = Callable[[str], str]
 ShaderCode = TypeVar(name="ShaderCode", bound=str)
+
+Vec2 = TypeVar("Vec2", bound=Tuple[float])
+
+
+
+OFFSETS_3x3 = [
+    (-1, -1), (0, -1), (1, -1),
+    (-1, 0),  (0, 0),  (1, 0),
+    (-1, 1),  (0, 1),  ( 1, 1)
+]
+
+OFFSETS_DIAMOND = [
+    (0,-2),
+    (-1, -1), (0, -1), (1, -1),
+    (-2, 0), (-1, 0), (0, 0), (1, 0), (2, 0),
+    (-1, 1), (0, 1), (1, 1),
+    (2, 0)
+]
 
 
 def Vertex() -> ShaderCode:
@@ -53,23 +72,55 @@ def Slime() -> ShaderCode:
 def Conway() -> ShaderCode:
     return load_shader("conway.glsl")
 
-def symmetric_filter(corner: float, top: float,mid: float):
+def symmetric_filter_3x3(corner: float, top: float, mid: float):
     return [
         corner,top,corner,
         top,mid,top,
         corner,top,corner
     ]
-def custom_shader(convolve_vals: List[float], activation: str) -> ShaderCode:
-    def custom_activation(expr: str):
-        return f"float activate(float x){{ return {expr};}}"
 
-    def slime_activation():
-        return custom_activation("-1./(0.89*pow(x, 2.)+1.)+1.")
+def symmetric_filter_diamond(point, edge, inner, mid):
+    return [
+        point,
+        edge,inner,edge,
+        point,inner,mid,inner,point,
+        edge,inner,edge,
+        point
+    ]
 
-    def convolve_filter(convolve_filter: List[float]):
-        return ",".join([str(float(i)) for i in convolve_filter])
 
+def glsl_int_tuple(v: Vec2):
+    return f"ivec2({v[0]},{v[1]})"
+
+def convolve_filter_offset_glsl(filter: List[Tuple[float]]):
     return f"""
+        ivec2 offsets[{len(filter)}] = ivec2[{len(filter)}](
+                {",".join([glsl_int_tuple(i) for i in filter])}
+            );
+    """
+
+@dataclass
+class Convolution_Filter:
+    """
+    The offsets of the cells we want to use in the convolution and the values used for mulitplying them
+    Must be the same length and in the same order
+    """
+    convolution_values: List[float]
+    convolution_offsets: List[Vec2]
+
+
+
+def custom_activation(expr: str):
+    return f"float activate(float x){{ return {expr};}}"
+
+def slime_activation():
+    return "-1./(0.89*pow(x, 2.)+1.)+1."
+
+def custom_shader(convolution_filter: Convolution_Filter, activation: str) -> ShaderCode:
+    def comma_sep_floats(convolve_filter: List[float]):
+        return ",".join([str(float(i)) for i in convolve_filter])
+    n_filters = len(convolution_filter.convolution_values)
+    glsl = f"""
         #version 330
         uniform sampler2D Texture;
         out float out_vert;
@@ -82,25 +133,17 @@ def custom_shader(convolve_vals: List[float], activation: str) -> ShaderCode:
         void main() {{
             int width = textureSize(Texture, 0).x;
             ivec2 in_text = ivec2(gl_VertexID % width, gl_VertexID / width);
-            float convolve_filter[9] = float[9](
-                       {convolve_filter(convolve_vals)}
+            float convolve_filter[{n_filters}] = float[{n_filters}](
+                       {comma_sep_floats(convolution_filter.convolution_values)}
             );
-            ivec2 offsets[9] = ivec2[9](
-                ivec2(-1,-1),
-                ivec2(0,-1),
-                ivec2(1,-1),
-                ivec2(-1,0),
-                ivec2(0,0),
-                ivec2(1,0),
-                ivec2(-1,1),
-                ivec2(0,1),
-                ivec2(1,1)
-            );
+            {convolve_filter_offset_glsl(convolution_filter.convolution_offsets)}
 
             float convolve_sum = 0;
-            for (int i=0;i<9;i++){{
+            for (int i=0;i<{len(convolution_filter.convolution_values)};i++){{
                 convolve_sum += cell(in_text.x + offsets[i].x, in_text.y + offsets[i].y) * convolve_filter[i];
             }}
             out_vert = activate(convolve_sum);
         }}
     """
+    print(glsl)
+    return glsl

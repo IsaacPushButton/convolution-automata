@@ -31,16 +31,22 @@ class Worms(Preset):
 
 class WobblyWorms(Preset):
     program = shaders.custom_shader(
-                convolve_vals=[
+                convolution_filter=shaders.Convolution_Filter(
+                    convolution_values=[
                     0.68, -0.8, 0.68,
                     -0.8, -0.66, -0.8,
                     0.68, -0.8, 0.68
                 ],
+                    convolution_offsets=shaders.OFFSETS_3x3
+                ),
                 activation="-1./pow(2., (0.9*pow(x, 2.)))+1."
             )
 
 class InkyCells(Preset):
     program = shaders.custom_shader(
-                convolve_vals=shaders.symmetric_filter(.77, -0.85, -0.2),
+                convolution_filter=shaders.Convolution_Filter(
+                    convolution_values=shaders.symmetric_filter_3x3(.77, -0.85, -0.2),
+                    convolution_offsets=shaders.OFFSETS_3x3
+                ),
                 activation="-1./(0.89*pow(x, 2.)+1.)+1."
             )
