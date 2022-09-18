@@ -7,9 +7,13 @@ import moderngl_window as mglw
 from aenum import Enum, auto
 import numpy as np
 
-from shaders import custom_shader, random_symetric, slime_activation, Shader, worm_activation, random_filter
+import shaders
+import convolution_helper
 
-
+BUTTON_MAPPING = {
+    1 : 1.0,
+    2 : 0.0
+}
 class Skip(Enum):
     Even = auto()
     Odd = auto()
@@ -31,6 +35,7 @@ def print_filter(filter: List[float]):
     print(",".join(str_vals[:3]))
     print(",".join(str_vals[3:6]))
     print(",".join(str_vals[6:]))
+    print(f"Sum: {sum(filter)}")
 
 def new_window(game_config: GameConfig):
     """Making class in a closure to pass values into it a bit easier"""
@@ -89,7 +94,7 @@ def new_window(game_config: GameConfig):
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
                 self.texture.write(self.pbo)
 
-        def set_program(self, program: Shader):
+        def set_program(self, program: shaders.Shader):
             self.transform_prog = self.ctx.program(
                 vertex_shader=program,
                 varyings=['out_vert']
@@ -101,11 +106,11 @@ def new_window(game_config: GameConfig):
 
         def mouse_press_event(self, x: int, y: int, button: int):
             self.last_button = button
-            poke_size = 5
             buffer_vals = np.frombuffer(self.pbo.read(), dtype="f4").reshape(self.width, self.height)
             buffer_vals = buffer_vals.copy()
             ny = self.height - y
-            buffer_vals[ny-poke_size:ny+poke_size,x-poke_size:x+poke_size] = button - 1
+            for cell in convolution_helper.make_diamond_offset(55):
+                buffer_vals[ny + cell[0], x + cell[1]] = convolution_helper.random_float(1)
             self.pbo.write(buffer_vals)
             self.texture.write(self.pbo)
 
@@ -114,18 +119,23 @@ def new_window(game_config: GameConfig):
             if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.SPACE:
                 self.paused = not self.paused
             if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.C:
-                new_filter = random_filter()
-                print_filter(new_filter)
+                new_filter = convolution_helper.random_symetric_small_bullseye(1)
+                print_filter(new_filter.convolution_values)
                 self.set_program(
-                    custom_shader(
+                    shaders.custom_shader(
                         new_filter,
-                        slime_activation()
+                        shaders.slime_activation()
                     )
                 )
             if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.V:
                 self.texture = self.ctx.texture((self.width, self.height), 1, np.random.rand(self.width, self.height).astype('f4').tobytes(), dtype='f4')
                 self.texture.filter = moderngl.NEAREST, moderngl.NEAREST
-                self.texture.swizzle = 'RRR1'  # What components texelFetch will get from the texture (in shader)
+                self.texture.swizzle = 'RGB1'  # What components texelFetch will get from the texture (in shader)
+
+            if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.B:
+                self.texture = self.ctx.texture((self.width, self.height), 1, np.zeros((self.width, self.height),"f4").tobytes(), dtype='f4')
+                self.texture.filter = moderngl.NEAREST, moderngl.NEAREST
+                self.texture.swizzle = 'RGB1'  # What components texelFetch will get from the texture (in shader)
 
         def render(self, time, frame_time):
             self.ctx.clear(1.0, 1.0, 1.0)

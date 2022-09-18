@@ -4,11 +4,11 @@ from window import new_window, GameConfig, Skip
 
 if __name__ == '__main__':
     window = new_window(GameConfig(
-        window_size=(800, 800),
-        texture_size=(800, 800),
+        window_size=(1000, 1000),
+        texture_size=(1000, 1000),
         desired_fps=60,
-        skip=Skip.Even,
-        preset=presets.Worms,
+        skip=Skip.Odd,
+        preset=presets.BurningGliders,
         pause_start=False
     ))
     window.run()
