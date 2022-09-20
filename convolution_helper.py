@@ -115,6 +115,7 @@ class Convolution_Filter:
     convolution_values: List[float]
     convolution_offsets: List[Vec2]
 
+
 def random_float(abs_max: float) -> float:
     return ((random.random() - 0.5) * 2) * abs_max
 

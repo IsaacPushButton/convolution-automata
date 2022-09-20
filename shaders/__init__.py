@@ -39,15 +39,14 @@ def insert(n: float, invert: bool):
     else:
         return n
 
-def Frag(r: float, g: float, b: float, invert=False) -> ShaderCode:
+def Frag() -> ShaderCode:
     return f"""
     #version 330
     uniform sampler2D Texture;
     in vec2 v_text;
     out vec4 f_color;
     void main() {{
-        float factor = texture(Texture, v_text).r;
-        f_color = vec4({insert(r, invert)}*factor,{insert(g,invert)}*factor,{insert(b,invert)}*factor,1.);
+        f_color = texture(Texture, v_text);
     }}
 """
 
@@ -61,17 +60,26 @@ def Conway() -> ShaderCode:
     return load_shader("conway.glsl")
 
 
+def comma_sep_floats(floats: List[float]):
+    return ",".join([str(float(i)) for i in floats])
 
 def glsl_int_tuple(v: Vec2):
     return f"ivec2({v[0]},{v[1]})"
 
-def convolve_filter_offset_glsl(filter: List[Tuple[float]]):
+def convolve_filter_offset_glsl(filter: List[Vec2], var_suffix: str):
     return f"""
-            ivec2 offsets[{len(filter)}] = ivec2[{len(filter)}](
+            ivec2 offsets_{var_suffix}[{len(filter)}] = ivec2[{len(filter)}](
                     {",".join([glsl_int_tuple(i) for i in filter])}
                 );
         """
 
+def convolve_filter_values_glsl(filter: List[float], _len: int, var_suffix: str):
+    return f"""
+        float convolve_filter_{var_suffix}[{_len}] = float[{_len}](
+                           {comma_sep_floats(filter)}
+                           
+                );
+    """
 
 
 def slime_activation():
@@ -83,37 +91,43 @@ def worm_activation():
 def custom_activation(expr: str):
     return f"float activate(float x){{ return {expr};}}"
 
-def slime_activation():
-    return "-1./(0.89*pow(x, 2.)+1.)+1."
+def custom_shader(convolution_filters: List[convolution_helper.Convolution_Filter], activation: str) -> ShaderCode:
+    convolve_glsl_block = ""
+    cols = ["red", "green", "blue"]
+    for col, fil in zip(cols, convolution_filters):
+        convolve_glsl_block += f"""
+            float {col} = 0.;
+            {convolve_filter_values_glsl(fil.convolution_values, len(fil.convolution_offsets), col)}
+            {convolve_filter_offset_glsl(fil.convolution_offsets, col)}
+            for (int i=0;i<{len(fil.convolution_values)};i++){{
+                {col} += cell_{col}(in_text.x + offsets_{col}[i].x, in_text.y + offsets_{col}[i].y) * convolve_filter_{col}[i];
+            }}
+            {col} = activate({col});
+        """
 
-
-def custom_shader(convolution_filter: convolution_helper.Convolution_Filter, activation: str) -> ShaderCode:
-    def comma_sep_floats(convolve_filter: List[float]):
-        return ",".join([str(float(i)) for i in convolve_filter])
-    n_filters = len(convolution_filter.convolution_values)
     glsl = f"""
         #version 330
         uniform sampler2D Texture;
-        out float out_vert;
-        out float last_vert;
-        float cell(int x, int y) {{
-            ivec2 tSize = textureSize(Texture, 0).xy;
+        out vec3 out_vert;
+        ivec2 tSize = textureSize(Texture, 0).xy;
+        float cell_red(int x, int y) {{
             return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).r;
-        }}        
+        }}     
+        float cell_green(int x, int y) {{
+            return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).g;
+        }}   
+        float cell_blue(int x, int y) {{
+            return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).b;
+        }}   
+    
         {custom_activation(activation)}
         void main() {{
             int width = textureSize(Texture, 0).x;
-            ivec2 in_text = ivec2(gl_VertexID % width, gl_VertexID / width);
-            float convolve_filter[{n_filters}] = float[{n_filters}](
-                       {comma_sep_floats(convolution_filter.convolution_values)}
-            );
-            {convolve_filter_offset_glsl(convolution_filter.convolution_offsets)}
-
-            float convolve_sum = 0;
-            for (int i=0;i<{len(convolution_filter.convolution_values)};i++){{
-                convolve_sum += cell(in_text.x + offsets[i].x, in_text.y + offsets[i].y) * convolve_filter[i];
-            }}
-            out_vert = activate(convolve_sum);
+            ivec2 in_text = ivec2(gl_VertexID % tSize[0], gl_VertexID / tSize[0]);
+            {convolve_glsl_block}
+            
+            out_vert = vec3({",".join(cols)});
         }}
     """
+    print(glsl)
     return glsl

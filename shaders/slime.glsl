@@ -4,7 +4,8 @@
 uniform sampler2D Texture;
 
 out float out_vert;
-out float last_vert;
+
+
 float cell(int x, int y) {
     // get the texture size
     ivec2 tSize = textureSize(Texture, 0).xy;

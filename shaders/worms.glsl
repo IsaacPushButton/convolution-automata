@@ -4,7 +4,7 @@
 uniform sampler2D Texture;
 
 out float out_vert;
-out float last_vert;
+out vec3 last_vert;
 float cell(int x, int y) {
     // get the texture size
     ivec2 tSize = textureSize(Texture, 0).xy;
@@ -48,5 +48,5 @@ void main() {
     for (int i=0;i<9;i++){
         convolve_sum += cell(in_text.x + offsets[i].x, in_text.y + offsets[i].y) * convolve_filter[i];
     }
-    out_vert = activate(convolve_sum);
+    out_vert = (activate(convolve_sum), 1.0, 1.0);
 }
