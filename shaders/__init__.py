@@ -16,8 +16,6 @@ FragShader = Callable[[str], str]
 ShaderCode = TypeVar(name="ShaderCode", bound=str)
 
 
-
-
 def Vertex() -> ShaderCode:
     return """  
         #version 330
@@ -33,11 +31,13 @@ def Vertex() -> ShaderCode:
         }
     """
 
+
 def insert(n: float, invert: bool):
     if invert:
-        return 1 -n
+        return 1 - n
     else:
         return n
+
 
 def Frag() -> ShaderCode:
     return f"""
@@ -50,11 +50,14 @@ def Frag() -> ShaderCode:
     }}
 """
 
+
 def Worm() -> ShaderCode:
     return load_shader("worms.glsl")
 
+
 def Slime() -> ShaderCode:
     return load_shader("slime.glsl")
+
 
 def Conway() -> ShaderCode:
     return load_shader("conway.glsl")
@@ -63,8 +66,10 @@ def Conway() -> ShaderCode:
 def comma_sep_floats(floats: List[float]):
     return ",".join([str(float(i)) for i in floats])
 
+
 def glsl_int_tuple(v: Vec2):
     return f"ivec2({v[0]},{v[1]})"
+
 
 def convolve_filter_offset_glsl(filter: List[Vec2], var_suffix: str):
     return f"""
@@ -72,6 +77,7 @@ def convolve_filter_offset_glsl(filter: List[Vec2], var_suffix: str):
                     {",".join([glsl_int_tuple(i) for i in filter])}
                 );
         """
+
 
 def convolve_filter_values_glsl(filter: List[float], _len: int, var_suffix: str):
     return f"""
@@ -85,42 +91,68 @@ def convolve_filter_values_glsl(filter: List[float], _len: int, var_suffix: str)
 def slime_activation():
     return "-1./(0.89*pow(x, 2.)+1.)+1."
 
+
 def worm_activation():
     return "-1./pow(2., (0.6*pow(x, 2.)))+1."
+
 
 def custom_activation(expr: str):
     return f"float activate(float x){{ return {expr};}}"
 
-def custom_shader(convolution_filters: List[convolution_helper.Convolution_Filter], activation: str) -> ShaderCode:
+
+def custom_shader(convolution_filters: List[convolution_helper.ConvolutionFilter], activation: str,
+                  red_relation: List[float] = None, blue_relation: List[float] = None, green_relation: List[float] = None) -> ShaderCode:
     convolve_glsl_block = ""
+
     cols = ["red", "green", "blue"]
+    col_dict = {
+        "red" :  red_relation if red_relation else [0,0,0],
+        "blue" : blue_relation if blue_relation else [0,0,0],
+        "green" : green_relation if green_relation else [0,0,0]
+    }
     for col, fil in zip(cols, convolution_filters):
         convolve_glsl_block += f"""
             float {col} = 0.;
             {convolve_filter_values_glsl(fil.convolution_values, len(fil.convolution_offsets), col)}
             {convolve_filter_offset_glsl(fil.convolution_offsets, col)}
             for (int i=0;i<{len(fil.convolution_values)};i++){{
-                {col} += cell_{col}(in_text.x + offsets_{col}[i].x, in_text.y + offsets_{col}[i].y) * convolve_filter_{col}[i];
+                {col} -= cell_{col}(in_text.x + offsets_{col}[i].x, in_text.y + offsets_{col}[i].y) * convolve_filter_{col}[i];
             }}
-            {col} = activate({col});
+            
+            
+            //{col} = activate({col});
         """
+    for col in cols:
+        convolve_glsl_block += f"""
+            
+            {col} += {cols[0]} * {col_dict[col][0]};
+            {col} -= {cols[1]} * {col_dict[col][1]};
+            {col} -= {cols[2]} * {col_dict[col][2]};
+
+            {col} = activate({col});
+               """
 
     glsl = f"""
         #version 330
         uniform sampler2D Texture;
         out vec3 out_vert;
         ivec2 tSize = textureSize(Texture, 0).xy;
+        
+        {custom_activation(activation)}
+
         float cell_red(int x, int y) {{
-            return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).r;
+            vec4 tex = texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0);
+            return tex.r;
         }}     
         float cell_green(int x, int y) {{
-            return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).g;
+            vec4 tex = texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0);
+            return tex.g;
         }}   
         float cell_blue(int x, int y) {{
-            return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).b;
+            vec4 tex = texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0);
+            return tex.b;
         }}   
     
-        {custom_activation(activation)}
         void main() {{
             int width = textureSize(Texture, 0).x;
             ivec2 in_text = ivec2(gl_VertexID % tSize[0], gl_VertexID / tSize[0]);

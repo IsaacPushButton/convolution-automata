@@ -25,6 +25,12 @@ class Preset:
         self.frag: shaders.Shader = shaders.Frag()
 
 
+convolve_filter_red_flatworms= (
+    0.8601278018436618, -0.9978944412540862, 0.8601278018436618, -0.9978944412540862, -0.7082081119597763,
+    -0.9978944412540862, 0.8601278018436618, -0.9978944412540862, 0.8601278018436618
+)
+
+convolve_flatworm = convolution_helper.symmetric_filter_3x3(0.8601278018436618, -0.9978944412540862, -0.7082081119597763)
 
 convolution_filter_r = convolution_helper.symmetric_filter_3x3(0.2781675312739802, -0.9434019420809658, -0.9434019420809658)
 convolution_filter_g = convolution_helper.symmetric_filter_medium_circle(-1.3391863202051066, 1.555111014243741,-0.916115840759975, 0.1)
@@ -32,8 +38,8 @@ convolution_filter_b = convolution_helper.symmetric_filter_3x3(0.278167531273980
 
 MulipleNeighbours = Preset(
     program=shaders.custom_shader(
-        convolution_filters=[convolution_filter_r, convolution_helper.Convolution_Filter(convolution_values=[0], convolution_offsets=[(0,0)]), convolution_helper.Convolution_Filter(convolution_values=[0], convolution_offsets=[(0,0)])],
-        activation=shaders.worm_activation()
+        convolution_filters=[convolve_flatworm, convolve_flatworm, convolve_flatworm],
+        activation=shaders.slime_activation()
     ),
 )
 

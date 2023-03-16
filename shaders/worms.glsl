@@ -6,10 +6,7 @@ uniform sampler2D Texture;
 out float out_vert;
 out vec3 last_vert;
 float cell(int x, int y) {
-    // get the texture size
     ivec2 tSize = textureSize(Texture, 0).xy;
-    // Ensure lookups are not going outside the texture area because
-    // texelFetch do not support texture repeat / wrap modes
     return texelFetch(Texture, ivec2((x + tSize.x) % tSize.x, (y + tSize.y) % tSize.y), 0).r;
 }
 

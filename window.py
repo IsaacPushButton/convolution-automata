@@ -9,6 +9,9 @@ import numpy as np
 
 import shaders
 import convolution_helper
+from PIL import Image
+from numpy import asarray
+
 
 BUTTON_MAPPING = {
     1 : 1.0,
@@ -19,6 +22,10 @@ class Skip(Enum):
     Odd = auto()
     NoSkip = auto()
     Three = auto()
+
+
+BRUSH = convolution_helper.make_diamond_filter(41, 10).convolution_offsets
+
 
 @dataclass
 class GameConfig:
@@ -104,6 +111,7 @@ def new_window(game_config: GameConfig):
         def mouse_drag_event(self, x: int, y: int, dx: int, dy: int):
             self.mouse_press_event(x, y, self.last_button)
 
+
         def mouse_press_event(self, x: int, y: int, button: int):
             self.last_button = button
             buffer_vals = np.frombuffer(self.pbo.read(), dtype="f4").reshape((self.width, self.height, 3))
@@ -111,7 +119,7 @@ def new_window(game_config: GameConfig):
             sx, sy = game_config.window_size[0] / game_config.texture_size[0], game_config.window_size[1] / game_config.texture_size[1]
             ny = int(self.height - (y / sy))
             nx = int(x / sx)
-            for cell in convolution_helper.make_diamond_offset(41):
+            for cell in BRUSH:
                 for rgb in range(len(buffer_vals[ny + cell[0], nx + cell[1]])):
                     buffer_vals[int(ny + cell[0]), int(nx + cell[1]), rgb] = convolution_helper.random_float(1)
             self.pbo.write(buffer_vals)
@@ -122,31 +130,24 @@ def new_window(game_config: GameConfig):
             if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.SPACE:
                 self.paused = not self.paused
             if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.C:
-                new_filter = convolution_helper.random_symetric_small_bullseye(1)
-                print_filter(new_filter.convolution_values)
 
-                convolution_filter_r = convolution_helper.symmetric_filter_small_circle(
-                    convolution_helper.random_float(1),
-                    convolution_helper.random_float(1),
-                    convolution_helper.random_float(1))
-                convolution_filter_g = convolution_helper.symmetric_filter_small_circle(
-                    convolution_helper.random_float(1),
-                    convolution_helper.random_float(1),
-                    convolution_helper.random_float(1),
-                )
-                convolution_filter_b = convolution_helper.symmetric_filter_3x3(
-                   convolution_helper.random_float(1),
-                   convolution_helper.random_float(1),
-                   convolution_helper.random_float(1),
-                )
+
+                convolution_filter_r = convolution_helper.make_diamond_filter(7,2)
+                convolution_filter_g = convolution_helper.make_diamond_filter(5,4)
+                convolution_filter_b = convolution_helper.make_diamond_filter(9,4)
+
 
                 self.set_program(
                     shaders.custom_shader(
                         convolution_filters=[convolution_filter_r, convolution_filter_g, convolution_filter_b],
-                        activation=shaders.worm_activation()
+                        red_relation=[convolution_helper.random_float(1), convolution_helper.random_float(1), convolution_helper.random_float(1)],
+                        green_relation=[convolution_helper.random_float(1), convolution_helper.random_float(1), convolution_helper.random_float(1)],
+                        blue_relation=[convolution_helper.random_float(1), convolution_helper.random_float(1), convolution_helper.random_float(1)],
+                activation=shaders.slime_activation()
                     )
                 )
             if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.V:
+
                 self.texture = self.ctx.texture((self.width, self.height), 3, np.random.rand(self.width, self.height,3).astype('f4').tobytes(), dtype='f4')
                 self.texture.filter = moderngl.NEAREST, moderngl.NEAREST
                 self.texture.swizzle = 'RGB1'  # What components texelFetch will get from the texture (in shader)
@@ -155,6 +156,17 @@ def new_window(game_config: GameConfig):
                 self.texture = self.ctx.texture((self.width, self.height), 3, np.zeros((self.width, self.height,3),"f4").tobytes(), dtype='f4')
                 self.texture.filter = moderngl.NEAREST, moderngl.NEAREST
                 self.texture.swizzle = 'RGB1'  # What components texelFetch will get from the texture (in shader)
+
+            if action == self.wnd.keys.ACTION_PRESS and key == self.wnd.keys.N:
+                loaded_image = np.array(Image.open('STARRY-NIGHT.jpg').rotate(180), 'float32')[:,:,:3]
+                loaded_image = loaded_image / 255.
+
+
+                self.texture = self.ctx.texture((self.width, self.height), 3,
+                                                loaded_image.tobytes(), dtype='f4')
+                self.texture.filter = moderngl.NEAREST, moderngl.NEAREST
+                self.texture.swizzle = 'RGB1'  # What components texelFetch will get from the texture (in shader)
+
 
         def render(self, time, frame_time):
             self.ctx.clear(1.0, 1.0, 1.0)
