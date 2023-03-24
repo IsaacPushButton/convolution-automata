@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-
+import noise
 import presets
 import moderngl
 import moderngl_window as mglw
@@ -9,6 +9,25 @@ import numpy as np
 
 import shaders
 import convolution_helper
+
+import noise
+
+# Generate Perlin noise with the noise.pnoise2() function
+def perlin_noise(x, y, scale=1.0, octaves=1, persistence=0.5, lacunarity=2.0):
+    return noise.pnoise2(x * scale, y * scale, octaves=octaves, persistence=persistence, lacunarity=lacunarity)
+
+# Example usage
+x = 0.1
+y = 0.5
+
+# Adjust the parameters as needed
+scale = 0.1
+octaves = 1
+persistence = 0.2
+lacunarity = 2
+
+
+
 
 BUTTON_MAPPING = {
     1 : 1.0,
@@ -144,8 +163,11 @@ def new_window(game_config: GameConfig):
             if time - self.last_updated > self.update_delay and not self.paused:
                 # We cant actually skip anything, so we just run the transform
                 # multiple times
+
                 self.tao.transform(self.pbo, vertices=self.width * self.height)
                 self.texture.write(self.pbo)
+                weight = 0.5 + 0.5 * perlin_noise(time, 0.0, scale, octaves, persistence, lacunarity)
+                self.transform_prog['noise'].value = weight
                 if game_config.skip != Skip.NoSkip:
                     self.tao.transform(self.pbo, vertices=self.width * self.height)
                     self.texture.write(self.pbo)

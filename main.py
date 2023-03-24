@@ -8,7 +8,7 @@ if __name__ == '__main__':
         texture_size=(1000, 1000),
         desired_fps=60,
         skip=Skip.Odd,
-        preset=presets.BurningGliders,
+        preset=presets.Worms,
         pause_start=False
     ))
     window.run()
